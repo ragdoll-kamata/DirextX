@@ -19,25 +19,6 @@ struct Vector4
 	float z;
 	float w;
 };
-struct Vector3 {
-	float x;
-	float y;
-	float z;
-};
-struct Matrix2x2 {
-	float m[2][2];
-};
-struct Matrix3x3 {
-	float m[3][3];
-};
-struct Matrix4x4 {
-	float m[4][4];
-};
-struct Transform {
-	Vector3 scale;
-	Vector3 rotare;
-	Vector3 translate;
-};
 //ウィンドウプロフージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	//
@@ -149,151 +130,6 @@ ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
 		IID_PPV_ARGS(&vertexResource));
 	assert(SUCCEEDED(hr));
 	return vertexResource;
-}
-
-Matrix4x4 MakeIdentity4x4()
-{
-	Matrix4x4 m1 = {};
-	for (int i = 0; i < 4; i++) {
-		m1.m[i][i] = 1.0f;
-	}
-	return m1;
-}
-
-Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2)
-{
-	Matrix4x4 m3 = {};
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			for (int k = 0; k < 4; k++) {
-				m3.m[i][j] += m1.m[i][k] * m2.m[k][j];
-			}
-		}
-	}
-	return m3;
-}
-Matrix4x4 MakeRotateXMatrix(float radian)
-{
-	return Matrix4x4{
-		1.0f,0.0f,0.0f,0.0f,
-		0.0f,std::cos(radian),std::sin(radian),0.0f,
-		0.0f,-std::sin(radian),std::cos(radian),0.0f,
-		0.0f,0.0f,0.0f,1.0f
-	};
-}
-
-Matrix4x4 MakeRotateYMatrix(float radian)
-{
-	return Matrix4x4{
-		std::cos(radian),0.0f,-std::sin(radian),0.0f,
-		0.0f,1.0f,0.0f,0.0f,
-		std::sin(radian),0.0f,std::cos(radian),0.0f,
-		0.0f,0.0f,0.0f,1.0f
-	};
-}
-
-Matrix4x4 MakeRotateZMatrix(float radian)
-{
-	return Matrix4x4{
-		std::cos(radian),std::sin(radian),0.0f,0.0f,
-		-std::sin(radian),std::cos(radian),0.0f,0.0f,
-		0.0f,0.0f,1.0f,0.0f,
-		0.0f,0.0f,0.0f,1.0f
-	};
-}
-Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate)
-{
-	Matrix4x4 matrixRotate = Multiply(MakeRotateXMatrix(rotate.x), Multiply(MakeRotateYMatrix(rotate.y), MakeRotateZMatrix(rotate.z)));
-	Matrix4x4 a = {
-	   scale.x * matrixRotate.m[0][0], scale.x * matrixRotate.m[0][1], scale.x * matrixRotate.m[0][2],0.0f,
-	   scale.y * matrixRotate.m[1][0], scale.y * matrixRotate.m[1][1], scale.y * matrixRotate.m[1][2],0.0f,
-	   scale.z * matrixRotate.m[2][0], scale.z * matrixRotate.m[2][1], scale.z * matrixRotate.m[2][2],0.0f,
-	   translate.x,translate.y,translate.z,1.0f
-	};
-	return a;
-}
-
-float Matrix2x2Determinant(const Matrix2x2& m1)
-{
-	return m1.m[0][0] * m1.m[1][1] - m1.m[1][0] * m1.m[0][1];
-}
-
-float Matrix3x3Determinant(const Matrix3x3& m1)
-{
-	float a = 0.0f;
-	Matrix2x2 m2 = {};
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 2; j++) {
-			for (int k = 0; k < 2; k++) {
-				m2.m[j][k] = m1.m[j >= i ? j + 1 : j][k + 1];
-			}
-		}
-		if (i % 2 == 0) {
-			a += m1.m[i][0] * Matrix2x2Determinant(m2);
-		} else {
-			a += -m1.m[i][0] * Matrix2x2Determinant(m2);
-		}
-	}
-	return a;
-}
-
-float Matrix4x4Determinant(const Matrix4x4& m1)
-{
-	float a = 0.0f;
-	Matrix3x3 m2 = {};
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 3; j++) {
-			for (int k = 0; k < 3; k++) {
-				m2.m[j][k] = m1.m[j >= i ? j + 1 : j][k + 1];
-			}
-		}
-		if (i % 2 == 0) {
-			a += Matrix3x3Determinant(m2) * m1.m[i][0];
-		} else {
-			a += Matrix3x3Determinant(m2) * -m1.m[i][0];
-		}
-	}
-	return a;
-}
-
-Matrix4x4 Inverse(const Matrix4x4& m1)
-{
-	float a = Matrix4x4Determinant(m1);
-	Matrix3x3 m2 = {};
-	Matrix4x4 m3 = {};
-
-	if (a == 0) {
-		return m1;
-	}
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			for (int k = 0; k < 3; k++) {
-				for (int l = 0; l < 3; l++) {
-					m2.m[k][l] = m1.m[k >= j ? k + 1 : k][l >= i ? l + 1 : l];
-				}
-			}
-
-			if ((i + j) % 2 == 0) {
-				m3.m[i][j] = Matrix3x3Determinant(m2) / a;
-			} else {
-				m3.m[i][j] = -Matrix3x3Determinant(m2) / a;
-			}
-		}
-	}
-	return m3;
-}
-
-Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip)
-{
-	Matrix4x4 m = {};
-
-	m.m[0][0] = (1.0f / tanf(fovY / 2.0f)) / aspectRatio;
-	m.m[1][1] = (1.0f / tanf(fovY / 2.0f));
-	m.m[2][2] = farClip / (farClip - nearClip);
-	m.m[2][3] = 1.0f;
-	m.m[3][2] = -nearClip * farClip / (farClip - nearClip);
-
-	return m;
 }
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -494,28 +330,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descriptionRootsignature.Flags =
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
-	D3D12_ROOT_PARAMETER rootParameters[2] = {};
+	D3D12_ROOT_PARAMETER rootParameters[1] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[0].Descriptor.ShaderRegister = 0;
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-	rootParameters[1].Descriptor.ShaderRegister = 0;
 	descriptionRootsignature.pParameters = rootParameters;
 	descriptionRootsignature.NumParameters = _countof(rootParameters);
 	
-
-
-	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
-
-	Matrix4x4* wvpData = nullptr;
-
-	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
-
-	*wvpData = MakeIdentity4x4();
-
-
-
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
 
 	Vector4* materialData = nullptr;
@@ -611,10 +432,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	scissorRect.top = 0;
 	scissorRect.bottom = kClientHeight;
 
-	Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-	Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-5.0f} };
-
-
 
 
 	MSG msg{};
@@ -645,18 +462,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-			transform.rotare.y += 0.01f;
-			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotare, transform.translate);
-			Matrix4x4 cameraMatrix= MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotare, cameraTransform.translate);
-			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-			Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
-			Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-
-			*wvpData = worldViewProjectionMatrix;
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
-
 			commandList->DrawInstanced(3, 1, 0, 0);
 
 
@@ -702,7 +508,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 #endif // _DEBUG
 	CloseWindow(hwnd);
 
-	wvpResource->Release();
 	materialResource->Release();
 
 	vertexResource->Release();
