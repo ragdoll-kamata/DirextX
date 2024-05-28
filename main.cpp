@@ -171,6 +171,7 @@ ID3D12DescriptorHeap* CreateDescriptorHeap(
 	return descriptorHeap;
 }
 
+
 Matrix4x4 MakeIdentity4x4()
 {
 	Matrix4x4 m1 = {};
@@ -317,6 +318,9 @@ Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip
 }
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+	//
+	CoInitializeEx(0, COINIT_MULTITHREADED);
+
 #pragma region Windowの生成
 	WNDCLASS wc{};
 	//ウィンドウプロフージャ
@@ -365,6 +369,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		debugController->SetEnableGPUBasedValidation(TRUE);
 	}
 #endif // _DEBUG
+
 
 	//
 	IDXGIFactory7* dxgiFactory = nullptr;
@@ -760,6 +765,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rootSignature->Release();
 	pixelShaderBlob->Release();
 	vertexShaderBlob->Release();
+
+	CoUninitialize();
 
 	IDXGIDebug1* debug;
 	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
