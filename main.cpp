@@ -644,8 +644,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-5.0f} };
 
-
-
+	float color[3] = {};
+	float scale[3] = {1.0f,1.0f,1.0f};
+	float rotare[3] = {};
+	float translate[3] = {};
+	
 
 	MSG msg{};
 	while (msg.message != WM_QUIT) {
@@ -685,7 +688,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap };
 			commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
-			transform.rotare.y += 0.01f;
+			
+			transform.scale.x = scale[0];
+			transform.scale.y = scale[1];
+			transform.scale.z = scale[2];
+
+			transform.rotare.x = rotare[0];
+			transform.rotare.y = rotare[1];
+			transform.rotare.z = rotare[2];
+			
+			transform.translate.x = translate[0];
+			transform.translate.y = translate[1];
+			transform.translate.z = translate[2];
+			
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotare, transform.translate);
 			Matrix4x4 cameraMatrix= MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotare, cameraTransform.translate);
 			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
@@ -693,9 +708,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 
 			*wvpData = worldViewProjectionMatrix;
+			*materialData = { color[0],color[1],color[2],1.0f };
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
+		
+			ImGui::Begin("Debug");
+			ImGui::ColorEdit3("color",color);
+			ImGui::DragFloat3("scale", scale,0.1f);
+			ImGui::DragFloat3("rotare", rotare, 0.1f);
+			ImGui::DragFloat3("translate", translate, 0.1f);
+			ImGui::End();
 			ImGui::Render();
 
 			commandList->DrawInstanced(3, 1, 0, 0);
