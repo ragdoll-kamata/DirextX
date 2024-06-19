@@ -359,6 +359,22 @@ Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip
 	return m;
 }
 
+
+Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float bottom, float nearClip, float farClip)
+{
+	Matrix4x4 m = {};
+
+	m.m[0][0] = 2.0f / (right - left);
+	m.m[1][1] = 2.0f / (top - bottom);
+	m.m[2][2] = 1.0f / (farClip - nearClip);
+	m.m[3][3] = 1.0f;
+	m.m[3][0] = (left + right) / (left - right);
+	m.m[3][1] = (top + bottom) / (bottom - top);
+	m.m[3][2] = nearClip / (nearClip - farClip);
+
+	return m;
+}
+
 DirectX::ScratchImage LoadTexture(const std::string& filePath) {
 	DirectX::ScratchImage image{};
 	std::wstring filePathW = ConvertString(filePath);
@@ -774,6 +790,36 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexData[5].position = { 0.5f,-0.5f,-0.5f,1.0f };
 	vertexData[5].texcoord = { 1.0f,1.0f };
 
+	//
+	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
+
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
+	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
+	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
+	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
+
+	VertexData* vertexDataSprite = nullptr;
+	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
+	vertexDataSprite[0].position = { 0.0f,0.0f,0.0f,1.0f };
+	vertexDataSprite[0].texcoord = { 0.0f,0.0f };
+	vertexDataSprite[1].position = { 640.0f,360.0f,0.0f,1.0f };
+	vertexDataSprite[1].texcoord = { 1.0f,1.0f };
+	vertexDataSprite[2].position = { 0.0f,360.0f,0.0f,1.0f };
+	vertexDataSprite[2].texcoord = { 0.0f,1.0f };
+
+	vertexDataSprite[3].position = { 0.0f,0.0f,0.0f,1.0f };
+	vertexDataSprite[3].texcoord = { 0.0f,0.0f };
+	vertexDataSprite[4].position = { 640.0f,0.0f,0.0f,1.0f };
+	vertexDataSprite[4].texcoord = { 1.0f,0.0f };
+	vertexDataSprite[5].position = { 640.0f,360.0f,0.0f,1.0f };
+	vertexDataSprite[5].texcoord = { 1.0f,1.0f };
+
+	ID3D12Resource* transfomationMatrixResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
+
+	Matrix4x4* transfomationMatrixDataSprite = nullptr;
+	transfomationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transfomationMatrixDataSprite));
+
+	*transfomationMatrixDataSprite = MakeIdentity4x4();
 
 	D3D12_VIEWPORT viewport{};
 	viewport.Width = kClientWidth;
@@ -832,7 +878,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-5.0f} };
 
-
+	Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 
 	MSG msg{};
@@ -881,13 +927,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 			Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 
+			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotare, transformSprite.translate);
+			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
+			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
+			Matrix4x4 worldViewProjectionMatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
+
 			*wvpData = worldViewProjectionMatrix;
+			*transfomationMatrixDataSprite = worldViewProjectionMatrixSprite;
+
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 			ImGui::Render();
 
 			commandList->DrawInstanced(6, 1, 0, 0);
+
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			commandList->SetGraphicsRootConstantBufferView(1, transfomationMatrixResourceSprite->GetGPUVirtualAddress());
+
+			commandList->DrawInstanced(6, 1, 0, 0);
+
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 			
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -940,6 +999,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	debugController->Release();
 #endif // _DEBUG
 	CloseWindow(hwnd);
+	
+	transfomationMatrixResourceSprite->Release();
+	vertexResourceSprite->Release();
 
 	wvpResource->Release();
 	materialResource->Release();
